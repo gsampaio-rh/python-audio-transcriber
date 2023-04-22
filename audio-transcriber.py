@@ -23,15 +23,28 @@ def check_device():
         device = "cpu"
     return device
 
+def get_model():
+    """Prompt the user to select a Whisper model."""
+    models = ['tiny', 'base', 'small', 'medium', 'large']
+    banner("Please select a Whisper model:")
+    for i, model in enumerate(models):
+        print(f"{i+1}: {model}")
+    choice = input("Enter the number of the model you wish to use: ")
+    while not choice.isdigit() or int(choice) not in range(1, len(models)+1):
+        choice = input("Invalid choice. Please enter the number of the model you wish to use: ")
+    return models[int(choice)-1]
+
+
 def get_result(audio_file, duration):
     # Convert MP3 file to WAV format
     sound = AudioSegment.from_mp3(audio_file)
     audio_file_wav = os.path.splitext(audio_file)[0] + '.wav'
     sound.export(audio_file_wav, format="wav")
 
-    # transcribe with original whisper
+    # transcribe with selected Whisper model
+    model_name = get_model()
     banner("Transcribing text")
-    model = whisperx.load_model("base", device=check_device())
+    model = whisperx.load_model(model_name, device=check_device())
     result = model.transcribe(audio_file_wav)
 
     format_result(result, audio_file_wav)
