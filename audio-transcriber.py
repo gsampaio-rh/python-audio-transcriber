@@ -34,20 +34,69 @@ def get_model():
         choice = input("Invalid choice. Please enter the number of the model you wish to use: ")
     return models[int(choice)-1]
 
+def print_time(total_time):
+    """Prints time in seconds or minutes"""
+    if total_time >= 60:
+        total_time = total_time / 60
+        print(f"{total_time:.2f} minutes")
+    else:
+        print(f"{total_time:.2f} seconds")
 
-def get_result(audio_file, duration):
-    # Convert MP3 file to WAV format
-    sound = AudioSegment.from_mp3(audio_file)
-    audio_file_wav = os.path.splitext(audio_file)[0] + '.wav'
-    sound.export(audio_file_wav, format="wav")
+def transcribe_audio(audio_file):
+    """Transcribe an audio file."""
+    # Get information about the audio file
+    audio = AudioSegment.from_file(audio_file)
+    duration = audio.duration_seconds
+    size = os.path.getsize(audio_file)
+    created_date = time.ctime(os.path.getctime(audio_file))
 
-    # transcribe with selected Whisper model
+    # Print information about the audio file
+    banner("Audio file information:")
+    print(f"  Name: {os.path.basename(audio_file)}")
+    print("  Duration: ")
+    print_time(duration)
+    print(f"  Size: {size / 1024:.2f} KB")
+    print(f"  Created date: {created_date}\n")
+
+    # Get Whisper Model
     model_name = get_model()
-    banner("Transcribing text")
     model = whisperx.load_model(model_name, device=check_device())
-    result = model.transcribe(audio_file_wav)
+    
+    # Estimate the time taken to transcribe the audio file
+    banner("Transcribing 30 seconds to estimate")
+    audio_duration = min(duration, 120)  # transcribe at most 30 seconds of audio
+    print("Audio Estimation Sample Duration: ")
+    print_time(audio_duration)
 
-    format_result(result, audio_file_wav)
+    audio_segment = audio[:audio_duration * 1000]
+    audio_segment.export('audio_segment.wav', format="wav")
+    start_time = time.time()
+    model.transcribe('audio_segment.wav')
+    
+    elapsed_time_30= time.time() - start_time
+    print("Total time taken to transcribe 30 seconds of audio: ")
+    print_time(elapsed_time_30)
+    
+    tps = elapsed_time_30/audio_duration
+    print("Transcription per second: ")
+    print_time(tps)
+    
+    total_estimated_time = tps * duration
+    print("Estimated time to transcribe the full audio: ")
+    print_time(total_estimated_time)
+    
+    # Transcribe the full audio file
+    banner("Transcribing text")
+    start_time = time.time()
+    result = model.transcribe(audio_file)
+    elapsed_time = time.time() - start_time
+
+    format_result(result, audio_file)
+
+    # Print total time taken
+    banner("Transcription complete")
+    print("Total time taken to transcribe the full audio: ")
+    print_time(elapsed_time)
 
 def format_result(result, audio_file):
     # print(result["segments"]) # before alignment
@@ -70,20 +119,12 @@ def main():
     """Main function."""
     audio_file = input("Please enter the path to the MP3 file: ")
 
-    # Get the duration and size of the audio file
+    # Get the duration of the audio file
     audio = AudioSegment.from_file(audio_file)
     duration = audio.duration_seconds
-    size = os.path.getsize(audio_file)
-    created_date = time.ctime(os.path.getctime(audio_file))
 
-    # Print information about the audio file
-    banner("Audio file information:")
-    print(f"  Name: {os.path.basename(audio_file)}")
-    print(f"  Duration: {duration:.2f} seconds")
-    print(f"  Size: {size / 1024:.2f} KB")
-    print(f"  Created date: {created_date}\n")
-
-    get_result(audio_file, duration)  # Get audio transcription and translation if needed
+    # Transcribe the full audio file
+    transcribe_audio(audio_file)
 
 if __name__ == "__main__":
     main()
