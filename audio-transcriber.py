@@ -1,4 +1,5 @@
 import whisperx
+import time
 import torch
 import os
 from pydub import AudioSegment
@@ -12,7 +13,7 @@ else:
 
 def banner(text):
     """Display a message when the script is working in the background"""
-    print(f"# {text} #")
+    print(f"##### {text} #####")
 
 def check_device():
     """Check CUDA availability."""
@@ -50,13 +51,25 @@ def format_result(result, audio_file):
         for segment in result_aligned["segments"]:
             f.write(segment["text"] + "\n")
 
-    print(f"Transcription saved to {output_file}")
+    banner(f"Transcription saved to {output_file}")
 
 def main():
     """Main function."""
     audio_file = input("Please enter the path to the MP3 file: ")
-    # Get the duration of the audio file
-    duration = AudioSegment.from_file(audio_file).duration_seconds
+
+    # Get the duration and size of the audio file
+    audio = AudioSegment.from_file(audio_file)
+    duration = audio.duration_seconds
+    size = os.path.getsize(audio_file)
+    created_date = time.ctime(os.path.getctime(audio_file))
+
+    # Print information about the audio file
+    banner("Audio file information:")
+    print(f"  Name: {os.path.basename(audio_file)}")
+    print(f"  Duration: {duration:.2f} seconds")
+    print(f"  Size: {size / 1024:.2f} KB")
+    print(f"  Created date: {created_date}\n")
+
     get_result(audio_file, duration)  # Get audio transcription and translation if needed
 
 if __name__ == "__main__":
