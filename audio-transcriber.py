@@ -42,15 +42,17 @@ def print_time(total_time):
     else:
         print(f"{total_time:.2f} seconds")
 
-def transcribe_audio(audio_file):
-    """Transcribe an audio file."""
-    # Get information about the audio file
+def get_audio_info(audio_file):
+    """Get information about the audio file."""
     audio = AudioSegment.from_file(audio_file)
     duration = audio.duration_seconds
     size = os.path.getsize(audio_file)
     created_date = time.ctime(os.path.getctime(audio_file))
+    return audio, duration, size, created_date
 
-    # Print information about the audio file
+def print_audio_info(audio_file):
+    """Print information about the audio file."""
+    audio, duration, size, created_date = get_audio_info(audio_file)
     banner("Audio file information:")
     print(f"  Name: {os.path.basename(audio_file)}")
     print("  Duration: ")
@@ -58,47 +60,56 @@ def transcribe_audio(audio_file):
     print(f"  Size: {size / 1024:.2f} KB")
     print(f"  Created date: {created_date}\n")
 
-    # Get Whisper Model
-    model_name = get_model()
-    model = whisperx.load_model(model_name, device=check_device())
-    
-    # Estimate the time taken to transcribe the audio file
+def print_date(timestamp):
+    """Prints a timestamp in a human-readable format."""
+    date_string = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+    return date_string
+
+def estimate_transcription_time(audio_file):
+    """Estimate the time taken to transcribe the audio file."""
+    audio, duration, _, _ = get_audio_info(audio_file)
     banner("Transcribing 120 seconds to estimate")
-    audio_duration = min(duration, 120)  # transcribe at most 30 seconds of audio
+    audio_duration = min(duration, 120)  # transcribe at most 120 seconds of audio
     print("Audio Estimation Sample Duration: ")
     print_time(audio_duration)
-
     audio_segment = audio[:audio_duration * 1000]
     audio_segment.export('audio_segment.wav', format="wav")
+    model_name = get_model()
+    model = whisperx.load_model(model_name, device=check_device())
     start_time = time.time()
     model.transcribe('audio_segment.wav')
-    
     elapsed_time_30= time.time() - start_time
     print("Total time taken to transcribe 30 seconds of audio: ")
     print_time(elapsed_time_30)
-    
     tps = elapsed_time_30/audio_duration
     print("Transcription per second: ")
     print_time(tps)
-    
     total_estimated_time = tps * duration
     print("Estimated time to transcribe the full audio: ")
     print_time(total_estimated_time)
+    return total_estimated_time, model
+
+def transcribe_audio(audio_file):
+    """Transcribe an audio file."""
+    print_audio_info(audio_file)
     
-    # Transcribe the full audio file
+    total_estimated_time, model = estimate_transcription_time(audio_file)
+    
     banner("Transcribing text")
     start_time = time.time()
+    print(f"Start time: {print_date(start_time)}")
     result = model.transcribe(audio_file)
-    elapsed_time = time.time() - start_time
-
+    end_time = time.time()
+    print(f"End time: {print_date(end_time)}")
+    elapsed_time = end_time - start_time
     format_result(result, audio_file)
-
-    # Print total time taken
     banner("Transcription complete")
+    
     print("Total time taken to transcribe the full audio: ")
     print_time(elapsed_time)
 
 def format_result(result, audio_file):
+    banner("Format result")
     # print(result["segments"]) # before alignment
 
     # load alignment model and metadata
