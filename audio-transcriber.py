@@ -65,7 +65,7 @@ def print_date(timestamp):
     date_string = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
     return date_string
 
-def estimate_transcription_time(audio_file):
+def estimate_transcription_time(audio_file, model):
     """Estimate the time taken to transcribe the audio file."""
     audio, duration, _, _ = get_audio_info(audio_file)
     banner("Transcribing 120 seconds to estimate")
@@ -74,8 +74,6 @@ def estimate_transcription_time(audio_file):
     print_time(audio_duration)
     audio_segment = audio[:audio_duration * 1000]
     audio_segment.export('audio_segment.wav', format="wav")
-    model_name = get_model()
-    model = whisperx.load_model(model_name, device=check_device())
     start_time = time.time()
     model.transcribe('audio_segment.wav')
     elapsed_time_30= time.time() - start_time
@@ -89,27 +87,26 @@ def estimate_transcription_time(audio_file):
     print_time(total_estimated_time)
     return total_estimated_time, model
 
-def transcribe_audio(audio_file):
+def transcribe_audio(audio_file, model):
     """Transcribe an audio file."""
-    print_audio_info(audio_file)
-    
-    total_estimated_time, model = estimate_transcription_time(audio_file)
     
     banner("Transcribing text")
     start_time = time.time()
-    print(f"Start time: {print_date(start_time)}")
+    print(f"Start transcription time: {print_date(start_time)}")
     result = model.transcribe(audio_file)
     end_time = time.time()
-    print(f"End time: {print_date(end_time)}")
+    print(f"End transcription time: {print_date(end_time)}")
     elapsed_time = end_time - start_time
-    format_result(result, audio_file)
-    banner("Transcription complete")
-    
     print("Total time taken to transcribe the full audio: ")
     print_time(elapsed_time)
+    banner("Transcription complete")
 
+    return result
+    
 def format_result(result, audio_file):
     banner("Format result")
+    start_time = time.time()
+    print(f"Start format time: {print_date(start_time)}")
     # print(result["segments"]) # before alignment
 
     # load alignment model and metadata
@@ -124,6 +121,12 @@ def format_result(result, audio_file):
         for segment in result_aligned["segments"]:
             f.write(segment["text"] + "\n")
 
+    end_time = time.time()
+    print(f"End format time: {print_date(end_time)}")
+    elapsed_time = end_time - start_time
+    print("Total time taken to format the full text: ")
+    print_time(elapsed_time)
+
     banner(f"Transcription saved to {output_file}")
 
 def main():
@@ -133,9 +136,19 @@ def main():
     # Get the duration of the audio file
     audio = AudioSegment.from_file(audio_file)
     duration = audio.duration_seconds
+    
+    print_audio_info(audio_file)
+    
+    model_name = get_model()
+    model = whisperx.load_model(model_name, device=check_device())
+
+    total_estimated_time, model = estimate_transcription_time(audio_file, model)
 
     # Transcribe the full audio file
-    transcribe_audio(audio_file)
+    result = transcribe_audio(audio_file, model)
+    
+    # Format the result
+    format_result(result, audio_file)
 
 if __name__ == "__main__":
     main()
