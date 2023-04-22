@@ -25,17 +25,17 @@ def check_device():
 def get_result(audio_file, duration):
     # Convert MP3 file to WAV format
     sound = AudioSegment.from_mp3(audio_file)
-    audio_file = os.path.splitext(audio_file)[0] + '.wav'
-    sound.export(audio_file, format="wav")
+    audio_file_wav = os.path.splitext(audio_file)[0] + '.wav'
+    sound.export(audio_file_wav, format="wav")
 
     # transcribe with original whisper
     banner("Transcribing text")
     model = whisperx.load_model("base", device=check_device())
-    result = model.transcribe(audio_file)
+    result = model.transcribe(audio_file_wav)
 
-    format_result('transcription.txt', result, audio_file)
+    format_result(result, audio_file_wav)
 
-def format_result(file_name, result, audio_file):
+def format_result(result, audio_file):
     # print(result["segments"]) # before alignment
 
     # load alignment model and metadata
@@ -45,12 +45,12 @@ def format_result(file_name, result, audio_file):
     result_aligned = whisperx.align(result["segments"], model_a, metadata, audio_file, device)
 
     # Write transcription to file
-    with open(file_name, "w") as f:
+    output_file = os.path.splitext(audio_file)[0] + '.txt'
+    with open(output_file, "w") as f:
         for segment in result_aligned["segments"]:
             f.write(segment["text"] + "\n")
 
-    print(f"Transcription saved to {file_name}")
-
+    print(f"Transcription saved to {output_file}")
 
 def main():
     """Main function."""
