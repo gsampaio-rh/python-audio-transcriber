@@ -63,7 +63,7 @@ def transcribe_audio(audio_file):
     model = whisperx.load_model(model_name, device=check_device())
     
     # Estimate the time taken to transcribe the audio file
-    banner("Transcribing 30 seconds to estimate")
+    banner("Transcribing 120 seconds to estimate")
     audio_duration = min(duration, 120)  # transcribe at most 30 seconds of audio
     print("Audio Estimation Sample Duration: ")
     print_time(audio_duration)
