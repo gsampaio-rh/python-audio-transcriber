@@ -1,5 +1,5 @@
 import whisperx
-import time
+import time, datetime
 import torch
 import os
 import re
@@ -53,46 +53,6 @@ def millisec(timeStr):
   s = (int)((int(spl[0]) * 60 * 60 + int(spl[1]) * 60 + float(spl[2]) )* 1000)
   return s
 
-def attach_audio_segments(audio_file,diarize_segments):
-
-    banner("Attach audio")
-    start_time = time.time()
-    print(f"Start attach audio time: {print_date(start_time)}")
-    
-    spacermilli = 2000
-    sounds = AudioSegment.silent(duration=spacermilli)
-    audio_segment = AudioSegment.from_file(audio_file)  # Load the audio segment
-    segments = []
-
-    # print(diarize_segments)
-    # print("Type: ")
-    # print(type(diarize_segments)) 
-
-    for l in str(diarize_segments).splitlines():
-        print (l)
-        start, end =  tuple(re.findall('[0-9]+:[0-9]+:[0-9]+\.[0-9]+', string=l))
-        start = int(millisec(start)) #milliseconds
-        end = int(millisec(end))  #milliseconds
-        
-        print (start)
-        print (end)
-
-        segments.append(len(sounds))
-        segment = audio_segment[start:end]  # Extract the desired segment
-        sounds = sounds.append(segment, crossfade=0)  # Append the segment to the sounds
-        # sounds = sounds.append(audio_file[start:end], crossfade=0)
-        # sounds = sounds.append(spacer, crossfade=0)
-
-    sounds.export("dz.wav", format="wav")
-
-    print(segments[:8])
-
-    end_time = time.time()
-    print(f"End attach audio time: {print_date(end_time)}")
-    elapsed_time = end_time - start_time
-    print("Total time taken to attach audio: ")
-    print_time(elapsed_time)
-
 def print_time(total_time):
     """Prints time in seconds or minutes"""
     if total_time >= 60:
@@ -100,6 +60,17 @@ def print_time(total_time):
         print(f"{total_time:.2f} minutes")
     else:
         print(f"{total_time:.2f} seconds")
+
+def format_time(milliseconds):
+    # Convert milliseconds to timedelta
+    time_delta = datetime.timedelta(milliseconds=milliseconds)
+
+    # Format the time as [HH:MM:SS.mmm]
+    time_str = str(time_delta)
+    if "." in time_str:
+        time_str = time_str[:time_str.index(".")]
+
+    return time_str
 
 def get_audio_info(audio_file):
     """Get information about the audio file."""
@@ -161,7 +132,7 @@ def transcribe_audio(audio_file, model):
     banner("Transcription complete")
 
     return result
-    
+
 def format_result(result, audio_file, diarize_segments, device):
     banner("Format result")
     start_time = time.time()
@@ -173,16 +144,40 @@ def format_result(result, audio_file, diarize_segments, device):
 
     # align whisper output
     result_aligned = whisperx.align(result["segments"], model_a, metadata, audio_file, device)
-    
-    # assign text
-    # result_assigned = whisperx.assign_word_speakers(diarize_segments, result_aligned)
-    # print(result_assigned["segments"])
 
+    diarize_mapping = {}
+    for l in str(diarize_segments).splitlines():
+        match = re.search(r'\[ (.*?) --> (.*?)\] (\w+) (\w+)', l)
+        if match:
+            start, end, _, speaker = match.groups()
+            start = int(millisec(start))  # milliseconds
+            end = int(millisec(end))  # milliseconds
+            diarize_mapping[start] = {
+                'start': start,
+                'end': end,
+                'speaker': speaker
+            }
+            
     # Write transcription to file
     output_file = os.path.splitext(audio_file)[0] + '.txt'
     with open(output_file, "w") as f:
         for segment in result_aligned["segments"]:
-            f.write(segment["text"] + "\n")
+            
+            # Convert start and end times of result segment to integers
+            segment_start = int(segment["start"] * 1000)
+            segment_end = int(segment["end"] * 1000)
+
+            # Find the matching diarize segment for the result segment
+            for diarize_info in diarize_mapping.values():
+                if diarize_info["start"] <= segment_start <= diarize_info["end"]:
+                    speaker = diarize_info["speaker"]
+                    break
+            
+            st = format_time(segment_start)
+            et = format_time(segment_end)
+
+            text = segment["text"]
+            f.write(f"[{st} --> {et}] {speaker}: {text}\n")
 
     end_time = time.time()
     print(f"End format time: {print_date(end_time)}")
@@ -226,7 +221,7 @@ def main():
     # print(diarize_segments)
 
     # Attach Audio
-    attach_audio_segments(audio_file, diarize_segments)
+    # attach_audio_segments(audio_file, diarize_segments)
 
     # Format the result
     format_result(result, audio_file, diarize_segments, device)
