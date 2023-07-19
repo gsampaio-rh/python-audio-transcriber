@@ -189,9 +189,9 @@ def format_result(result, audio_file, diarize_segments, device):
 
 def main():
     """Main function."""
-    # audio_file = input("Please enter the path to the MP3 file: ")
-    audio_file = "audio_segment.wav"
-    hf_token="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"
+    audio_file = input("Please enter the path to the MP3 file: ")
+    # audio_file = "audio_segment.wav"
+    hf_token=""
     
     # Get the duration of the audio file
     audio = AudioSegment.from_file(audio_file)
