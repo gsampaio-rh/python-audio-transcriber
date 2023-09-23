@@ -82,6 +82,7 @@ yarn.lock
 
 # Transcription files
 *.txt
+transcriptions/
 
 # MacOS
 .DS_Store
