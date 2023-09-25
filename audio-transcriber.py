@@ -137,66 +137,64 @@ def format_result(result, audio_file, diarize_segments, device):
     banner("Format result")
     start_time = time.time()
     print(f"Start format time: {print_date(start_time)}")
-    # print(result["segments"]) # before alignment
 
-    # load alignment model and metadata
-    model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
+    # If diarize_segments is provided, format with speaker information
+    if diarize_segments:
+        # load alignment model and metadata
+        model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
 
-    # align whisper output
-    result_aligned = whisperx.align(result["segments"], model_a, metadata, audio_file, device)
+        # align whisper output
+        result_aligned = whisperx.align(result["segments"], model_a, metadata, audio_file, device)
 
-    diarize_mapping = {}
-    for l in str(diarize_segments).splitlines():
-        match = re.search(r'\[ (.*?) --> (.*?)\] (\w+) (\w+)', l)
-        if match:
-            start, end, _, speaker = match.groups()
-            start = int(millisec(start))  # milliseconds
-            end = int(millisec(end))  # milliseconds
-            diarize_mapping[start] = {
-                'start': start,
-                'end': end,
-                'speaker': speaker
-            }
-            
-    # Write transcription to file
-    output_file = os.path.splitext(audio_file)[0] + '.txt'
-    with open(output_file, "w") as f:
-        for segment in result_aligned["segments"]:
-            
-            # Convert start and end times of result segment to integers
-            segment_start = int(segment["start"] * 1000)
-            segment_end = int(segment["end"] * 1000)
+        diarize_mapping = {}
+        for l in str(diarize_segments).splitlines():
+            match = re.search(r'\[ (.*?) --> (.*?)\] (\w+) (\w+)', l)
+            if match:
+                start, end, _, speaker = match.groups()
+                start = int(millisec(start))  # milliseconds
+                end = int(millisec(end))  # milliseconds
+                diarize_mapping[start] = {
+                    'start': start,
+                    'end': end,
+                    'speaker': speaker
+                }
 
-            # Find the matching diarize segment for the result segment
-            for diarize_info in diarize_mapping.values():
-                if diarize_info["start"] <= segment_start <= diarize_info["end"]:
-                    speaker = diarize_info["speaker"]
-                    break
-            
-            st = format_time(segment_start)
-            et = format_time(segment_end)
-
-            text = segment["text"]
-            f.write(f"[{st} --> {et}] {speaker}: {text}\n")
+        # Write transcription to file with speaker information
+        output_file = os.path.splitext(audio_file)[0] + '_diarized.txt'
+        with open(output_file, "w") as f:
+            for segment in result_aligned["segments"]:
+                segment_start = int(segment["start"] * 1000)
+                segment_end = int(segment["end"] * 1000)
+                for diarize_info in diarize_mapping.values():
+                    if diarize_info["start"] <= segment_start <= diarize_info["end"]:
+                        speaker = diarize_info["speaker"]
+                        break
+                st = format_time(segment_start)
+                et = format_time(segment_end)
+                text = segment["text"]
+                f.write(f"[{st} --> {et}] {speaker}: {text}\n")
+    else:
+        # Write transcription to file without speaker information
+        output_file = os.path.splitext(audio_file)[0] + '.txt'
+        with open(output_file, "w") as f:
+            for segment in result["segments"]:
+                st = format_time(int(segment["start"] * 1000))
+                et = format_time(int(segment["end"] * 1000))
+                text = segment["text"]
+                f.write(f"[{st} --> {et}] {text}\n")
 
     end_time = time.time()
     print(f"End format time: {print_date(end_time)}")
     elapsed_time = end_time - start_time
     print("Total time taken to format the full text: ")
     print_time(elapsed_time)
-
     banner(f"Transcription saved to {output_file}")
 
 def main():
     """Main function."""
     audio_file = input("Please enter the path to the MP3 file: ")
-    # audio_file = "audio_segment.wav"
     hf_token=""
-    
-    # Get the duration of the audio file
-    audio = AudioSegment.from_file(audio_file)
-    duration = audio.duration_seconds
-    
+
     print_audio_info(audio_file)
     
     model_name = get_model()
@@ -209,22 +207,16 @@ def main():
     print("Device: {}".format(device))
     print("Compute Type Name: {}".format(compute_type))
 
-    # Estimate
-    # total_estimated_time, model = estimate_transcription_time(audio_file, model)
-
     # Transcribe the full audio file
     result = transcribe_audio(audio_file, model)
-    # print(result)
 
-    # Diarize audio
-    diarize_segments = diarize_audio_segments(audio_file, hf_token)
-    # print(diarize_segments)
-
-    # Attach Audio
-    # attach_audio_segments(audio_file, diarize_segments)
-
-    # Format the result
-    format_result(result, audio_file, diarize_segments, device)
+    # Ask user if they want the audio diarized
+    choice = input("Do you want the audio to be diarized? (yes/no): ").strip().lower()
+    if choice == 'yes':
+        diarize_segments = diarize_audio_segments(audio_file, hf_token)
+        format_result(result, audio_file, diarize_segments, device)
+    else:
+        format_result(result, audio_file, None, device)
 
 if __name__ == "__main__":
     main()
